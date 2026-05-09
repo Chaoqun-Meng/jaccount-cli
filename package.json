@@ -1,0 +1,39 @@
+{
+  "name": "jaccount-cli",
+  "version": "0.1.0",
+  "description": "Local-first Playwright CLI for SJTU jAccount task portal automation.",
+  "type": "module",
+  "bin": {
+    "jaccount": "./dist/src/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --import tsx \"tests/**/*.test.ts\"",
+    "dev": "tsx src/cli.ts",
+    "jaccount": "node dist/src/cli.js",
+    "prepare": "npm run build",
+    "prepack": "npm run build"
+  },
+  "files": [
+    "dist/src",
+    "config/entries.example.json",
+    "config/entries.schema.json",
+    "docs",
+    "skills",
+    "README.md",
+    "PROJECT_PLAN.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "playwright": "^1.49.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

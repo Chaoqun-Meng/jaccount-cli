@@ -1,0 +1,9 @@
+{
+  "$schema": "./entries.schema.json",
+  "entries": {
+    "graduate": {
+      "name": "研究生系统",
+      "matchText": "研究生"
+    }
+  }
+}

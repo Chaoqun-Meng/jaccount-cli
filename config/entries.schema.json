@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JAccount Entry Config",
+  "type": "object",
+  "required": ["entries"],
+  "properties": {
+    "entries": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "matchText": { "type": "string", "minLength": 1 },
+          "role": {
+            "type": "string",
+            "enum": ["link", "button", "menuitem", "tab"]
+          },
+          "selector": { "type": "string", "minLength": 1 },
+          "urlContains": { "type": "string", "minLength": 1 },
+          "expectedText": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

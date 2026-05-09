@@ -1,0 +1,4 @@
+interface:
+  display_name: "JAccount CLI"
+  short_description: "Call the local SJTU jAccount automation CLI safely"
+  default_prompt: "Use the local jaccount CLI to check login state, explore 交我办, or run a supported read-only workflow."
