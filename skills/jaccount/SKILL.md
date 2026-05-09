@@ -15,7 +15,7 @@ Use the local `jaccount` CLI as the only interface to SJTU jAccount / 交我办 
 
 - Always call `jaccount ... --json` and parse stdout as one JSON object.
 - Do not read `.env`, `auth-state.json`, cookies, localStorage, browser profiles, screenshots, or traces unless the user explicitly asks to inspect an artifact path returned by the CLI.
-- Treat `auth login` as user-interactive. The user completes password, captcha, SMS, or QR verification.
+- Treat `auth login` as user-interactive. QR login is the default: use the `qrCode` artifact path from stdout/stderr and wait for the user to scan it. The user completes password, captcha, SMS, or QR verification.
 - Read-only commands may be run directly.
 - Any command that submits, pays, deletes, unbinds, modifies profile data, or sends a form must require explicit user confirmation and must use `--dry-run` or `--yes` if such options exist.
 - If a command returns `ok: false`, report `error.code`, `error.message`, and relevant artifact paths. Do not guess from page content.
@@ -37,7 +37,7 @@ jaccount auth status --profile default --json
 Start interactive login:
 
 ```bash
-jaccount auth login --profile default --json
+jaccount auth login --method qr --profile default --json
 ```
 
 Explore the task hall:

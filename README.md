@@ -92,7 +92,7 @@ JACCOUNT_PASSWORD=
 
 ```bash
 npm run build
-npm run --silent jaccount -- auth login --profile default --json
+npm run --silent jaccount -- auth login --method qr --profile default --json
 npm run --silent jaccount -- auth status --profile default --json
 npm run --silent jaccount -- auth logout --profile default --yes --json
 npm run --silent jaccount -- task open --profile default --json
@@ -106,7 +106,7 @@ npm run --silent jaccount -- reimbursement appointments --profile default --json
 npm run --silent jaccount -- doctor --json
 ```
 
-`auth login` opens a headed browser by default and waits for you to finish jAccount authentication. If `JACCOUNT_USERNAME` and `JACCOUNT_PASSWORD` are set, the CLI will try to fill likely username/password fields, but captcha, SMS, and QR-code steps remain manual.
+`auth login` uses QR login by default. It can run in headless environments, saves the current QR code to the command artifact directory, and keeps the browser session alive while you scan it. Use `--method manual` for the original headed browser flow, or `--method password` to try filling `JACCOUNT_USERNAME` / `JACCOUNT_PASSWORD` before manual verification.
 
 After login succeeds, the CLI saves an explicit auth snapshot at:
 
@@ -117,6 +117,29 @@ After login succeeds, the CLI saves an explicit auth snapshot at:
 Later `auth status` and `task` commands restore this snapshot before opening the task page. This covers SSO session cookies that Chrome may otherwise drop when the browser closes.
 
 All command actions write a single JSON object to stdout. Diagnostic text goes to stderr or runtime artifacts.
+
+## QR Login on Headless Servers
+
+QR login is the preferred server bootstrap path:
+
+```bash
+jaccount auth login --method qr --profile default --json
+```
+
+During the run, stderr renders a terminal QR code and also prints the QR image path, for example:
+
+```text
+~/.jaccount-cli/artifacts/<runId>/login-qr.png
+```
+
+If terminal QR rendering fails, open or copy that image before it expires, scan it with the official SJTU login app, and leave the CLI process running until it returns the final JSON result. Use `--no-show-qr` to skip terminal QR rendering. The QR image is a short-lived sensitive artifact and must not be committed.
+
+Fallbacks:
+
+```bash
+jaccount auth login --method manual --profile default --json
+jaccount auth login --method password --profile default --json
+```
 
 ## Entry Config
 

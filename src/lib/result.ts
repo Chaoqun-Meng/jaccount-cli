@@ -6,6 +6,7 @@ export type ArtifactMap = {
   log: string | null;
   trace: string | null;
   screenshots?: Record<string, string>;
+  qrCode?: string | null;
 };
 
 export type CommandResult<TData extends Record<string, unknown> = Record<string, unknown>> = {

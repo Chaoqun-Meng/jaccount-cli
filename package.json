@@ -7,7 +7,8 @@
     "jaccount": "./dist/src/cli.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "node --test --import tsx \"tests/**/*.test.ts\"",
     "dev": "tsx src/cli.ts",
@@ -29,10 +30,15 @@
   },
   "dependencies": {
     "commander": "^12.1.0",
-    "playwright": "^1.49.0"
+    "jsqr": "^1.4.0",
+    "playwright": "^1.49.0",
+    "pngjs": "^7.0.0",
+    "qrcode-terminal": "^0.12.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@types/pngjs": "^6.0.5",
+    "@types/qrcode-terminal": "^0.12.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }

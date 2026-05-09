@@ -58,9 +58,13 @@ const auth = program.command("auth").description("Manage jAccount browser authen
 
 auth
   .command("login")
-  .description("Open a headed browser and wait for jAccount login to reach the task page.")
+  .description("Start jAccount login. QR login is the default and works in headless server environments.")
   .option("--profile <name>", "Profile name", DEFAULT_PROFILE)
   .option("--json", "Emit a single JSON result object", true)
+  .option("--method <method>", "Login method: qr, manual, or password", "qr")
+  .option("--headed", "Run browser headed; manual/password login always runs headed", false)
+  .option("--show-qr", "Render the QR code as terminal text on stderr", true)
+  .option("--no-show-qr", "Do not render the QR code in the terminal")
   .option("--timeout-ms <ms>", "Login timeout in milliseconds", parseInteger, LOGIN_TIMEOUT_MS)
   .option("--debug-sensitive-artifacts", "Allow sensitive login-page failure artifacts", false)
   .action((options) => runJsonCommand("auth login", options, authLogin));

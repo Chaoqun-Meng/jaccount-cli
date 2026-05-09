@@ -9,12 +9,14 @@ export type ErrorCode =
   | "INVALID_INPUT"
   | "NAVIGATION_TIMEOUT"
   | "PLAYWRIGHT_NOT_READY"
+  | "QR_CODE_NOT_FOUND"
   | "UNEXPECTED_ERROR";
 
 export type ErrorArtifacts = Partial<{
   screenshot: string | null;
   log: string | null;
   trace: string | null;
+  qrCode: string | null;
 }>;
 
 export class AppError extends Error {
