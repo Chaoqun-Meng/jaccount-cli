@@ -4,12 +4,12 @@ import { parseDotEnv } from "../../src/lib/env.js";
 
 test("parseDotEnv parses simple key values", () => {
   const parsed = parseDotEnv(`
-    JACCOUNT_USERNAME=alice
-    JACCOUNT_PASSWORD=secret
+    JACCOUNT_HOME=/tmp/jaccount-cli
+    JACCOUNT_PROFILE=default
   `);
 
-  assert.equal(parsed.JACCOUNT_USERNAME, "alice");
-  assert.equal(parsed.JACCOUNT_PASSWORD, "secret");
+  assert.equal(parsed.JACCOUNT_HOME, "/tmp/jaccount-cli");
+  assert.equal(parsed.JACCOUNT_PROFILE, "default");
 });
 
 test("parseDotEnv supports quotes and comments", () => {

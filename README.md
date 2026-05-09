@@ -37,7 +37,6 @@ npm ci
 npx playwright install chromium
 npm run build
 npm link
-cp .env.example .env
 jaccount auth login --profile default --json
 ```
 
@@ -65,34 +64,17 @@ Runtime data is not stored in the repo. By default it goes to:
 
 The default runtime directory is `~/.jaccount-cli`. You can move it later by setting `JACCOUNT_HOME`.
 
-Override this with:
-
 ```bash
 export JACCOUNT_HOME=/path/to/runtime-state
 ```
 
-## Local Secrets
-
-The CLI automatically reads `.env` from the project root and does not override variables already set by your shell.
-
-```bash
-cp .env.example .env
-```
-
-Then fill:
-
-```text
-JACCOUNT_USERNAME=
-JACCOUNT_PASSWORD=
-```
-
-`.env` is ignored by Git.
+QR login does not require a `.env` file. `.env.example` only documents optional local environment overrides such as `JACCOUNT_HOME`.
 
 ## Commands
 
 ```bash
 npm run build
-npm run --silent jaccount -- auth login --method qr --profile default --json
+npm run --silent jaccount -- auth login --profile default --json
 npm run --silent jaccount -- auth status --profile default --json
 npm run --silent jaccount -- auth logout --profile default --yes --json
 npm run --silent jaccount -- task open --profile default --json
@@ -106,7 +88,7 @@ npm run --silent jaccount -- reimbursement appointments --profile default --json
 npm run --silent jaccount -- doctor --json
 ```
 
-`auth login` uses QR login by default. It can run in headless environments, saves the current QR code to the command artifact directory, and keeps the browser session alive while you scan it. Use `--method manual` for the original headed browser flow, or `--method password` to try filling `JACCOUNT_USERNAME` / `JACCOUNT_PASSWORD` before manual verification.
+`auth login` uses QR login only. It can run in headless environments, saves the current QR image to the command artifact directory, renders a terminal QR code on stderr, and keeps the browser session alive while you scan and confirm it.
 
 After login succeeds, the CLI saves an explicit auth snapshot at:
 
@@ -120,10 +102,10 @@ All command actions write a single JSON object to stdout. Diagnostic text goes t
 
 ## QR Login on Headless Servers
 
-QR login is the preferred server bootstrap path:
+QR login is the server bootstrap path:
 
 ```bash
-jaccount auth login --method qr --profile default --json
+jaccount auth login --profile default --json
 ```
 
 During the run, stderr renders a terminal QR code and also prints the QR image path, for example:
@@ -133,13 +115,6 @@ During the run, stderr renders a terminal QR code and also prints the QR image p
 ```
 
 If terminal QR rendering fails, open or copy that image before it expires, scan it with the official SJTU login app, and leave the CLI process running until it returns the final JSON result. Use `--no-show-qr` to skip terminal QR rendering. The QR image is a short-lived sensitive artifact and must not be committed.
-
-Fallbacks:
-
-```bash
-jaccount auth login --method manual --profile default --json
-jaccount auth login --method password --profile default --json
-```
 
 ## Entry Config
 
