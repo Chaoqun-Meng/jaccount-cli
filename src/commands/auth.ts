@@ -6,15 +6,20 @@ import { AppError } from "../lib/errors.js";
 import { safeScreenshot, writeLog } from "../lib/artifacts.js";
 import { closeSession, launchProfileSession } from "../lib/browser.js";
 import { restoreAuthState, saveAuthState } from "../lib/authState.js";
+import { tryFillCredentials } from "../lib/credentials.js";
 import { getAuthStatePath, getCommandPaths, getProfileDir, ensureRuntimeDirs, type CommandPaths } from "../lib/paths.js";
 import { isLikelyLoginPage, isTaskPage } from "../lib/url.js";
 import type { ArtifactMap } from "../lib/result.js";
 import { writeQrPngToStderr } from "../lib/terminalQr.js";
 
+export const LOGIN_METHODS = ["qr", "manual", "password"] as const;
+export type LoginMethod = typeof LOGIN_METHODS[number];
+
 const QR_CAPTURE_TIMEOUT_MS = 15000;
 
 export type AuthLoginOptions = {
   profile?: string;
+  method?: string;
   headed?: boolean;
   timeoutMs?: number;
   debugSensitiveArtifacts?: boolean;
@@ -38,24 +43,31 @@ export async function authLogin(runId: string, options: AuthLoginOptions): Promi
   artifacts: Partial<ArtifactMap>;
 }> {
   const profile = options.profile ?? DEFAULT_PROFILE;
+  const loginMethod = normalizeLoginMethod(options.method);
   const paths = getCommandPaths(runId);
   await ensureRuntimeDirs(paths);
 
   const profileDir = getProfileDir(profile);
   const session = await launchProfileSession({
     profileDir,
-    headless: !options.headed,
+    headless: loginMethod === "qr" ? !options.headed : false,
     timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   });
 
   const artifacts: Partial<ArtifactMap> = {};
+  let credentialsFilled = false;
+
   try {
-    process.stderr.write("JAccount QR login started. The browser may run headless; scan the terminal QR code or saved image when prompted.\n");
+    if (loginMethod === "qr") {
+      process.stderr.write("JAccount QR login started. The browser may run headless; scan the terminal QR code or saved image when prompted.\n");
+    } else {
+      process.stderr.write("JAccount browser opened. Complete jAccount verification in the browser window if prompted.\n");
+    }
 
     await session.page.goto(DEFAULT_TASK_URL, { waitUntil: "domcontentloaded" });
     await session.page.waitForLoadState("domcontentloaded").catch(() => undefined);
 
-    if (!isTaskPage(session.page.url())) {
+    if (!isTaskPage(session.page.url()) && loginMethod === "qr") {
       const qrCodePath = await prepareQrLogin(session.page, paths);
       artifacts.qrCode = qrCodePath;
       process.stderr.write("JAccount QR code saved to: " + qrCodePath + "\n");
@@ -68,6 +80,13 @@ export async function authLogin(runId: string, options: AuthLoginOptions): Promi
       process.stderr.write("Scan it before it expires. Waiting for jAccount to return to the task page...\n");
     }
 
+    if (!isTaskPage(session.page.url()) && loginMethod === "password") {
+      credentialsFilled = await tryFillCredentials(session.page);
+      if (credentialsFilled) {
+        process.stderr.write("Filled likely username/password fields from environment. Complete any remaining verification manually.\n");
+      }
+    }
+
     await waitForTaskPage(session.page, options.timeoutMs ?? LOGIN_TIMEOUT_MS);
     await session.page.waitForLoadState("domcontentloaded").catch(() => undefined);
     const authStatePath = await saveAuthState(session.context, profile);
@@ -78,11 +97,12 @@ export async function authLogin(runId: string, options: AuthLoginOptions): Promi
       profile,
       data: {
         loggedIn: true,
-        loginMethod: "qr",
+        loginMethod,
         currentUrl,
         title,
         profileDir,
-        authStatePath
+        authStatePath,
+        credentialsFilled
       },
       artifacts
     };
@@ -101,7 +121,7 @@ export async function authLogin(runId: string, options: AuthLoginOptions): Promi
 
     artifacts.log = await writeLog(
       paths,
-      "auth login failed\nmethod=qr\nurl=" + currentUrl + "\nerror=" + (error instanceof Error ? error.stack ?? error.message : String(error)) + "\n"
+      "auth login failed\nmethod=" + loginMethod + "\nurl=" + currentUrl + "\nerror=" + (error instanceof Error ? error.stack ?? error.message : String(error)) + "\n"
     );
 
     if (error instanceof AppError) {
@@ -185,6 +205,19 @@ export async function authLogout(_runId: string, options: AuthLogoutOptions): Pr
     },
     artifacts: {}
   };
+}
+
+export function normalizeLoginMethod(method: string | undefined): LoginMethod {
+  const normalized = method?.trim().toLowerCase() || "qr";
+  if (normalized === "qr" || normalized === "manual" || normalized === "password") {
+    return normalized;
+  }
+
+  throw new AppError(
+    "INVALID_INPUT",
+    "Invalid login method",
+    "Expected one of: " + LOGIN_METHODS.join(", ")
+  );
 }
 
 async function waitForTaskPage(page: Page, timeoutMs: number): Promise<void> {

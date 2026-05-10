@@ -68,13 +68,14 @@ The default runtime directory is `~/.jaccount-cli`. You can move it later by set
 export JACCOUNT_HOME=/path/to/runtime-state
 ```
 
-QR login does not require a `.env` file. `.env.example` only documents optional local environment overrides such as `JACCOUNT_HOME`.
+QR login does not require a `.env` file. `.env.example` only documents optional local environment overrides and the optional `--method password` prefill variables.
 
 ## Commands
 
 ```bash
 npm run build
 npm run --silent jaccount -- auth login --profile default --json
+npm run --silent jaccount -- auth login --method password --profile default --json
 npm run --silent jaccount -- auth status --profile default --json
 npm run --silent jaccount -- auth logout --profile default --yes --json
 npm run --silent jaccount -- task open --profile default --json
@@ -88,7 +89,9 @@ npm run --silent jaccount -- reimbursement appointments --profile default --json
 npm run --silent jaccount -- doctor --json
 ```
 
-`auth login` uses QR login only. It can run in headless environments, saves the current QR image to the command artifact directory, renders a terminal QR code on stderr, and keeps the browser session alive while you scan and confirm it.
+When invoking through `npm run`, keep the `--` separator before `auth`; otherwise npm consumes flags like `--method` and `--profile`. After `npm link` or global install, use `jaccount ...` directly without the separator.
+
+`auth login` uses QR login by default. It can run in headless environments, saves the current QR image to the command artifact directory, renders a terminal QR code on stderr, and keeps the browser session alive while you scan and confirm it. Use `--method password` to try filling `JACCOUNT_USERNAME` / `JACCOUNT_PASSWORD` before manual verification, or `--method manual` for a headed browser-only login.
 
 After login succeeds, the CLI saves an explicit auth snapshot at:
 
@@ -102,7 +105,7 @@ All command actions write a single JSON object to stdout. Diagnostic text goes t
 
 ## QR Login on Headless Servers
 
-QR login is the server bootstrap path:
+QR login is the recommended server bootstrap path:
 
 ```bash
 jaccount auth login --profile default --json
@@ -115,6 +118,29 @@ During the run, stderr renders a terminal QR code and also prints the QR image p
 ```
 
 If terminal QR rendering fails, open or copy that image before it expires, scan it with the official SJTU login app, and leave the CLI process running until it returns the final JSON result. Use `--no-show-qr` to skip terminal QR rendering. The QR image is a short-lived sensitive artifact and must not be committed.
+
+## Optional Password Login
+
+QR login is preferred and requires no account/password environment variables. If you explicitly want password prefill, create a local `.env` file:
+
+```bash
+cp .env.example .env
+```
+
+Then fill:
+
+```text
+JACCOUNT_USERNAME=
+JACCOUNT_PASSWORD=
+```
+
+Run:
+
+```bash
+jaccount auth login --method password --profile default --json
+```
+
+Captcha, SMS, QR, or other jAccount verification remains manual.
 
 ## Entry Config
 
