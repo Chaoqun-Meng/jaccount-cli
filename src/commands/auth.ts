@@ -48,42 +48,54 @@ export async function authLogin(runId: string, options: AuthLoginOptions): Promi
   await ensureRuntimeDirs(paths);
 
   const profileDir = getProfileDir(profile);
+  const headless = loginMethod === "manual" ? false : !options.headed;
   const session = await launchProfileSession({
     profileDir,
-    headless: loginMethod === "qr" ? !options.headed : false,
+    headless,
     timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   });
 
   const artifacts: Partial<ArtifactMap> = {};
   let credentialsFilled = false;
+  let passwordFallbackToQr = false;
 
   try {
     if (loginMethod === "qr") {
       process.stderr.write("JAccount QR login started. The browser may run headless; scan the terminal QR code or saved image when prompted.\n");
+    } else if (loginMethod === "password") {
+      process.stderr.write("JAccount password login started. Local OCR may be attempted; QR fallback is available in headless mode.\n");
     } else {
-      process.stderr.write("JAccount browser opened. Complete jAccount verification in the browser window if prompted.\n");
+      process.stderr.write("JAccount browser opened. Complete jAccount verification in the browser window.\n");
     }
 
     await session.page.goto(DEFAULT_TASK_URL, { waitUntil: "domcontentloaded" });
     await session.page.waitForLoadState("domcontentloaded").catch(() => undefined);
 
     if (!isTaskPage(session.page.url()) && loginMethod === "qr") {
-      const qrCodePath = await prepareQrLogin(session.page, paths);
-      artifacts.qrCode = qrCodePath;
-      process.stderr.write("JAccount QR code saved to: " + qrCodePath + "\n");
-      const terminalQrResult = await writeQrPngToStderr({ imagePath: qrCodePath, enabled: options.showQr !== false });
-      if (terminalQrResult.displayed) {
-        process.stderr.write("JAccount QR code rendered in the terminal.\n");
-      } else {
-        process.stderr.write("Terminal QR rendering skipped: " + terminalQrResult.reason + ". Open the image path above if needed.\n");
-      }
-      process.stderr.write("Scan it before it expires. Waiting for jAccount to return to the task page...\n");
+      artifacts.qrCode = await prepareAndPrintQrLogin(session.page, paths, options.showQr !== false);
     }
 
     if (!isTaskPage(session.page.url()) && loginMethod === "password") {
       credentialsFilled = await tryFillCredentials(session.page);
       if (credentialsFilled) {
-        process.stderr.write("Filled likely username/password fields from environment. Complete any remaining verification manually.\n");
+        process.stderr.write("Filled likely username/password fields from environment.\n");
+        const captchaSolved = await autoSolveCaptchaAndLogin(session.page);
+        if (captchaSolved) {
+          process.stderr.write("Auto-solved OCR captcha and submitted successfully.\n");
+        } else {
+          process.stderr.write("Password login did not complete automatically.\n");
+          if (headless) {
+            passwordFallbackToQr = true;
+            process.stderr.write("Falling back to QR login for headless completion.\n");
+            artifacts.qrCode = await prepareAndPrintQrLogin(session.page, paths, options.showQr !== false);
+          } else {
+            process.stderr.write("Complete the remaining verification in the browser window.\n");
+          }
+        }
+      } else if (headless) {
+        passwordFallbackToQr = true;
+        process.stderr.write("Could not fill username/password from environment. Falling back to QR login.\n");
+        artifacts.qrCode = await prepareAndPrintQrLogin(session.page, paths, options.showQr !== false);
       }
     }
 
@@ -102,7 +114,8 @@ export async function authLogin(runId: string, options: AuthLoginOptions): Promi
         title,
         profileDir,
         authStatePath,
-        credentialsFilled
+        credentialsFilled,
+        passwordFallbackToQr
       },
       artifacts
     };
@@ -226,6 +239,97 @@ async function waitForTaskPage(page: Page, timeoutMs: number): Promise<void> {
   }
 
   await page.waitForURL((url) => isTaskPage(url.toString()), { timeout: timeoutMs });
+}
+
+async function autoSolveCaptchaAndLogin(page: Page): Promise<boolean> {
+  // We must target the specific password submit button, because generic
+  // submit buttons might exist in other hidden tabs (like SMS login).
+  let submitButton = page.locator("#submit-password-button");
+  if (await submitButton.count().catch(() => 0) === 0) {
+    submitButton = page.locator("button[type='submit'], input[type='submit']").filter({ visible: true }).first();
+  }
+
+  // Scope the captcha search strictly to the password form container because
+  // SJTU has multiple duplicate #captcha-img elements in the DOM for SMS login.
+  const passwordForm = page.locator("#login-with-password");
+  const captchaInput = passwordForm.locator("input[name='captcha'], input[id*='captcha' i]").first();
+  const captchaImg = passwordForm.locator("img[src*='captcha'], #captcha-img").first();
+
+  // The SJTU page can hide the submit button temporarily right after filling
+  // the password, so wait for the form to become interactable again.
+  await submitButton.waitFor({ state: "visible", timeout: 4000 }).catch(() => undefined);
+
+  if (!(await submitButton.isVisible().catch(() => false))) {
+    return false;
+  }
+
+  for (let i = 0; i < 5; i++) {
+    if (await captchaImg.isVisible().catch(() => false) && await captchaInput.isVisible().catch(() => false)) {
+      process.stderr.write(`Attempting OCR captcha (try ${i + 1}/5)...\n`);
+      try {
+        // Use the exact element currently rendered in the DOM instead of
+        // issuing a separate request that may not match the active challenge.
+        const buffer = await captchaImg.screenshot();
+
+        const ddddocrModule = await import("ddddocr").catch(() => null);
+        if (!ddddocrModule) {
+          process.stderr.write("ddddocr is not installed. Skipping auto OCR.\n");
+          return false;
+        }
+
+        // @ts-ignore: Dynamic import type resolution workaround
+        const DdddOcr = (ddddocrModule.default?.default || ddddocrModule.default || ddddocrModule) as any;
+
+        if (typeof DdddOcr.create !== "function") {
+          process.stderr.write("OCR backend is unavailable. Falling back.\n");
+          break;
+        }
+
+        const ocr = await DdddOcr.create();
+        const code = await ocr.classification(buffer);
+
+        if (code) {
+          process.stderr.write("OCR captcha candidate filled.\n");
+          await captchaInput.fill(code).catch(() => undefined);
+        }
+      } catch (error) {
+        process.stderr.write(`OCR failed: ${error}\n`);
+      }
+    } else {
+      process.stderr.write("No captcha visible, submitting directly...\n");
+    }
+
+    try {
+      await submitButton.click();
+    } catch (error) {
+      process.stderr.write(`Password form submit failed: ${error}\n`);
+      return false;
+    }
+
+    try {
+      await page.waitForURL((url) => isTaskPage(url.toString()), { timeout: 3000 });
+      return true;
+    } catch {
+      if (await captchaImg.isVisible().catch(() => false)) {
+        await captchaImg.click().catch(() => undefined);
+        await page.waitForTimeout(1000);
+      }
+    }
+  }
+  return false;
+}
+
+async function prepareAndPrintQrLogin(page: Page, paths: CommandPaths, showQr: boolean): Promise<string> {
+  const qrCodePath = await prepareQrLogin(page, paths);
+  process.stderr.write("JAccount QR code saved to: " + qrCodePath + "\n");
+  const terminalQrResult = await writeQrPngToStderr({ imagePath: qrCodePath, enabled: showQr });
+  if (terminalQrResult.displayed) {
+    process.stderr.write("JAccount QR code rendered in the terminal.\n");
+  } else {
+    process.stderr.write("Terminal QR rendering skipped: " + terminalQrResult.reason + ". Open the image path above if needed.\n");
+  }
+  process.stderr.write("Scan it before it expires. Waiting for jAccount to return to the task page...\n");
+  return qrCodePath;
 }
 
 async function prepareQrLogin(page: Page, paths: CommandPaths): Promise<string> {

@@ -15,7 +15,7 @@ Use the local `jaccount` CLI as the only interface to SJTU jAccount / 交我办 
 
 - Always call `jaccount ... --json` and parse stdout as one JSON object.
 - Do not read `auth-state.json`, cookies, localStorage, browser profiles, screenshots, or traces unless the user explicitly asks to inspect an artifact path returned by the CLI.
-- Treat `auth login` as user-interactive. QR login is the default: the CLI renders a terminal QR code on stderr and returns a `qrCode` artifact path. Wait for the user to scan and confirm it. `--method password` may be used only when the user explicitly asks for password prefill; captcha, SMS, QR, or other jAccount verification remains manual.
+- Treat `auth login` as user-interactive whenever it returns a QR artifact. QR login is the default: the CLI renders a terminal QR code on stderr and returns a `qrCode` artifact path. `--method password` may be used only when the user explicitly asks for local password login; it can run headless and may fall back to QR. SMS, QR confirmation, and other jAccount risk checks remain user-interactive.
 - Read-only commands may be run directly.
 - Any command that submits, pays, deletes, unbinds, modifies profile data, or sends a form must require explicit user confirmation and must use `--dry-run` or `--yes` if such options exist.
 - If a command returns `ok: false`, report `error.code`, `error.message`, and relevant artifact paths. Do not guess from page content.
