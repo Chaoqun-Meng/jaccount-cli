@@ -63,7 +63,7 @@ auth
   .option("--profile <name>", "Profile name", DEFAULT_PROFILE)
   .option("--json", "Emit a single JSON result object", true)
   .option("--method <method>", "Login method: qr, manual, or password", "qr")
-  .option("--headed", "Run browser headed; manual/password login always runs headed", false)
+  .option("--headed", "Run browser headed; manual login is always headed", false)
   .option("--show-qr", "Render the QR code as terminal text on stderr", true)
   .option("--no-show-qr", "Do not render the QR code in the terminal")
   .option("--timeout-ms <ms>", "Login timeout in milliseconds", parseInteger, LOGIN_TIMEOUT_MS)

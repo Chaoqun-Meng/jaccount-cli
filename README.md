@@ -91,7 +91,7 @@ npm run --silent jaccount -- doctor --json
 
 When invoking through `npm run`, keep the `--` separator before `auth`; otherwise npm consumes flags like `--method` and `--profile`. After `npm link` or global install, use `jaccount ...` directly without the separator.
 
-`auth login` uses QR login by default. It can run in headless environments, saves the current QR image to the command artifact directory, renders a terminal QR code on stderr, and keeps the browser session alive while you scan and confirm it. Use `--method password` to try filling `JACCOUNT_USERNAME` / `JACCOUNT_PASSWORD` before manual verification, or `--method manual` for a headed browser-only login.
+`auth login` uses QR login by default. It can run in headless environments, saves the current QR image to the command artifact directory, renders a terminal QR code on stderr, and keeps the browser session alive while you scan and confirm it. Use `--method password` to try local username/password login in headless mode, with QR fallback if it cannot complete automatically. Use `--method manual` for a headed browser-only login.
 
 After login succeeds, the CLI saves an explicit auth snapshot at:
 
@@ -121,7 +121,7 @@ If terminal QR rendering fails, open or copy that image before it expires, scan 
 
 ## Optional Password Login
 
-QR login is preferred and requires no account/password environment variables. If you explicitly want password prefill, create a local `.env` file:
+QR login is the public default and requires no account/password environment variables. If you explicitly want local password login, create a local `.env` file:
 
 ```bash
 cp .env.example .env
@@ -140,7 +140,7 @@ Run:
 jaccount auth login --method password --profile default --json
 ```
 
-Captcha, SMS, QR, or other jAccount verification remains manual.
+Password mode may attempt local OCR for the image captcha. If it cannot complete in headless mode, it falls back to QR login and prints/saves the QR artifact. SMS, QR confirmation, and other jAccount risk checks remain user-interactive.
 
 ## Entry Config
 
@@ -172,4 +172,4 @@ This command verifies that Playwright can open a page, read the title, and save 
 
 - Profiles, screenshots, traces, logs, downloads, HAR files, and local entry config are ignored by Git.
 - Login-page failures do not save screenshots or traces unless `--debug-sensitive-artifacts` is explicitly passed.
-- The CLI does not bypass captcha, SMS, QR-code login, or school risk controls.
+- Password credentials are read only from the local environment. SMS, QR confirmation, and risk-control challenges remain user-interactive.
