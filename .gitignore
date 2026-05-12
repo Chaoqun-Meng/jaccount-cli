@@ -24,3 +24,5 @@ config/entries.local.json
 !.gitkeep
 
 PROJECT_PLAN.md
+
+.omc
